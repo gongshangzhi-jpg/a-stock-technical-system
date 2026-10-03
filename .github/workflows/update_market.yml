@@ -2,8 +2,6 @@ name: Update A-share market data
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "30 8 * * 1-5"
 
 permissions:
   contents: write
@@ -15,6 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,46 +30,60 @@ jobs:
         run: |
           python scripts/update_market.py
 
-      - name: Commit updated data
+      - name: Check generated database
         run: |
+          ls -lh data/
+
+          python - <<'PY'
+          import sqlite3
+
+          db = "data/market.db"
+          con = sqlite3.connect(db)
+
+          print("=== DATABASE CHECK ===")
+
+          tables = con.execute(
+              "select name from sqlite_master where type='table'"
+          ).fetchall()
+
+          print("tables:", tables)
+
+          for table in ["stocks", "daily"]:
+              try:
+                  n = con.execute(
+                      f"select count(*) from {table}"
+                  ).fetchone()[0]
+                  print(table, n)
+              except Exception as e:
+                  print(table, "ERROR", e)
+
+          con.close()
+          PY
+
+      - name: Sync latest main and commit database
+        run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # 先获取 GitHub 最新 main
+          # 保存本次刚刚生成的数据库
+          cp data/market.db /tmp/market.db
+
+          # 获取 GitHub 最新 main
           git fetch origin main
 
-          # 以远程 main 为基准，保留本次生成的 data/market.db
-          git reset --mixed origin/main
+          # 强制把工作目录同步到最新 main
+          git reset --hard origin/main
 
-          # 重新加入最新行情数据库
-          git add data/
+          # 恢复本次生成的数据库
+          cp /tmp/market.db data/market.db
 
-          # 如果有变化就提交
-          git diff --cached --quiet || git commit -m "Update A-share market data"
+          # 提交最新数据库
+          git add data/market.db
 
-          # 推送到最新 main
+          git diff --cached --quiet || \
+            git commit -m "Update A-share market data"
+
+          # 推送
           git push origin main
-      
-      - name: Check generated database
-        run: |
-            ls -lh data/
-            python - <<'PY'
-            import sqlite3
-            con = sqlite3.connect("data/market.db")
-        
-            print("tables:")
-            print(con.execute(
-                "select name from sqlite_master where type='table'"
-            ).fetchall())
-        
-            for table in ["stocks", "daily"]:
-                try:
-                    n = con.execute(
-                        f"select count(*) from {table}"
-                    ).fetchone()[0]
-                    print(table, n)
-                except Exception as e:
-                    print(table, e)
-        
-            con.close()
-            PY
