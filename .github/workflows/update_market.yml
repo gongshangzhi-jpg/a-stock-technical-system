@@ -49,3 +49,27 @@ jobs:
 
           # 推送到最新 main
           git push origin main
+      
+      - name: Check generated database
+        run: |
+            ls -lh data/
+            python - <<'PY'
+            import sqlite3
+            con = sqlite3.connect("data/market.db")
+        
+            print("tables:")
+            print(con.execute(
+                "select name from sqlite_master where type='table'"
+            ).fetchall())
+        
+            for table in ["stocks", "daily"]:
+                try:
+                    n = con.execute(
+                        f"select count(*) from {table}"
+                    ).fetchone()[0]
+                    print(table, n)
+                except Exception as e:
+                    print(table, e)
+        
+            con.close()
+            PY
