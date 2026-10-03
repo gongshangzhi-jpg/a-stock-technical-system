@@ -67,24 +67,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # 保存本次刚刚生成的数据库
           cp data/market.db /tmp/market.db
 
-          # 获取 GitHub 最新 main
           git fetch origin main
 
-          # 强制把工作目录同步到最新 main
           git reset --hard origin/main
 
-          # 恢复本次生成的数据库
           cp /tmp/market.db data/market.db
 
-          # 提交最新数据库
           git add data/market.db
 
           git diff --cached --quiet || \
             git commit -m "Update A-share market data"
 
-          # 推送
           git push origin main
-          
