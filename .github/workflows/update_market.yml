@@ -34,7 +34,18 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # 先获取 GitHub 最新 main
+          git fetch origin main
+
+          # 以远程 main 为基准，保留本次生成的 data/market.db
+          git reset --mixed origin/main
+
+          # 重新加入最新行情数据库
           git add data/
+
+          # 如果有变化就提交
           git diff --cached --quiet || git commit -m "Update A-share market data"
-          git pull --rebase origin main
+
+          # 推送到最新 main
           git push origin main
